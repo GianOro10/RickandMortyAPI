@@ -1,65 +1,86 @@
 import requests
 import tkinter as tk
-
-BASE_URL = "https://rickandmortyapi.com/api/"
-
-
-def search_characters(name):
-    """
-    Realiza una búsqueda de personajes en la API de Rick and Morty
-    a partir del nombre y devuelve una lista de resultados.
-    """
-    url = BASE_URL + "character"
-    params = {"name": name}
-    response = requests.get(url, params=params)
-    if response.status_code == 200:
-        return response.json()["results"]
-    else:
-        return []
+from tkinter import ttk
 
 
-def create_gui():
-    """
-    Crea la interfaz gráfica de la aplicación.
-    """
-    # Crear la ventana principal
-    window = tk.Tk()
-    window.title("Rick and Morty API Search")
+class App(tk.Tk):
+    def __init__(self):
+        super().__init__()
 
-    # Crear la barra de búsqueda
-    search_frame = tk.Frame(window)
-    search_frame.pack(side=tk.TOP, padx=10, pady=10)
+        self.title("Rick and Morty API Search")
+        self.geometry("600x400")
 
-    search_label = tk.Label(search_frame, text="Nombre del personaje:")
-    search_label.pack(side=tk.LEFT)
+        # Create search bar
+        self.search_var = tk.StringVar()
+        self.search_var.trace("w", self.search_characters)
+        self.search_entry = ttk.Entry(self, textvariable=self.search_var)
+        self.search_entry.pack(pady=10)
 
-    search_entry = tk.Entry(search_frame, width=30)
-    search_entry.pack(side=tk.LEFT)
+        # Create character list
+        self.character_listbox = tk.Listbox(self)
+        self.character_listbox.pack(fill=tk.BOTH, expand=True)
 
-    search_button = tk.Button(search_frame, text="Buscar",
-                              command=lambda: search_callback(search_entry.get()))
-    search_button.pack(side=tk.LEFT)
+        # Create character details frame
+        self.character_details_frame = tk.Frame(self)
+        self.character_details_frame.pack(fill=tk.BOTH, expand=True)
 
-    # Crear el marco para mostrar los resultados
-    results_frame = tk.Frame(window)
-    results_frame.pack(side=tk.TOP, padx=10, pady=10)
+        # Create animations
+        self.animation_canvas = tk.Canvas(self, bg="white", height=100)
+        self.animation_canvas.pack(fill=tk.X)
 
-    results_label = tk.Label(results_frame, text="Resultados de la búsqueda:")
-    results_label.pack(side=tk.TOP)
+        # Load characters
+        self.characters = []
+        self.load_characters()
 
-    results_listbox = tk.Listbox(results_frame, width=50, height=10)
-    results_listbox.pack(side=tk.TOP)
+    def load_characters(self):
+        response = requests.get("https://rickandmortyapi.com/api/character")
+        data = response.json()
+        self.characters = data["results"]
 
-    # Función de devolución de llamada para la búsqueda
-    def search_callback(name):
-        results = search_characters(name)
-        results_listbox.delete(0, tk.END)
-        for result in results:
-            results_listbox.insert(tk.END, result["name"])
+        # Populate character list
+        self.character_listbox.delete(0, tk.END)
+        for character in self.characters:
+            self.character_listbox.insert(tk.END, character["name"])
 
-    # Mostrar la ventana principal
-    window.mainloop()
+    def search_characters(self, *args):
+        search_term = self.search_var.get()
+
+        if search_term:
+            response = requests.get(
+                f"https://rickandmortyapi.com/api/character/?name={search_term}")
+            data = response.json()
+            self.characters = data["results"]
+        else:
+            self.load_characters()
+
+        # Populate character list
+        self.character_listbox.delete(0, tk.END)
+        for character in self.characters:
+            self.character_listbox.insert(tk.END, character["name"])
+
+    def show_character_details(self, event):
+        widget = event.widget
+        selection = widget.curselection()
+        if selection:
+            index = selection[0]
+            character = self.characters[index]
+
+            # Clear character details frame
+            for child in self.character_details_frame.winfo_children():
+                child.destroy()
+
+            # Populate character details frame
+            for key, value in character.items():
+                label = tk.Label(self.character_details_frame,
+                                 text=f"{key.capitalize()}:")
+                label.grid(sticky="W")
+                label = tk.Label(self.character_details_frame, text=value)
+                label.grid(row=self.character_details_frame.grid_size()[
+                           1]-1, column=1, sticky="W")
+
+    def run(self):
+        self.mainloop()
 
 
-if __name__ == "__main__":
-    create_gui()
+app = App()
+app.run()
